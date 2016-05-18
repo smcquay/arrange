@@ -86,6 +86,7 @@ type stats struct {
 }
 
 func main() {
+	log.SetFlags(log.Lshortfile)
 	if len(os.Args) != 3 {
 		fmt.Fprintf(os.Stderr, "%s\n", usage)
 		os.Exit(1)
