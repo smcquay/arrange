@@ -184,7 +184,7 @@ func parse(in <-chan string) <-chan file {
 				case notMedia:
 					log.Printf("%+v", err)
 				default:
-					log.Printf("%+v", err)
+					log.Printf("parse error: %+v", err)
 				}
 				continue
 			} else {
@@ -222,8 +222,10 @@ func _parse(path string) (file, error) {
 		defer f.Close()
 		x, err := exif.Decode(f)
 		if err != nil {
-			// TODO: sometimes valid jpgs have bad exif data (issue #1)
-			return nil, notMedia{path}
+			if exif.IsCriticalError(err) {
+				return nil, notMedia{path}
+			}
+			log.Printf("%q: exif.Decode, warning: %v", path, err)
 		}
 		tm, err := x.DateTime()
 		if err != nil {
