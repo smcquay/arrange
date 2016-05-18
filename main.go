@@ -4,12 +4,14 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
+	"image/jpeg"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rwcarlsen/goexif/exif"
 )
@@ -220,21 +222,33 @@ func _parse(path string) (file, error) {
 			return nil, fmt.Errorf("problem opening file: %v", err)
 		}
 		defer f.Close()
-		x, err := exif.Decode(f)
-		if err != nil {
-			if exif.IsCriticalError(err) {
-				return nil, notMedia{path}
-			}
-			log.Printf("%q: exif.Decode, warning: %v", path, err)
-		}
-		tm, err := x.DateTime()
-		if err != nil {
-			return nil, fmt.Errorf("problem getting datetime from pic %v: %v", path, err)
+
+		if _, err := jpeg.DecodeConfig(f); err != nil {
+			return nil, notMedia{path}
 		}
 		if _, err := f.Seek(0, 0); err != nil {
 			return nil, fmt.Errorf("couldn't seek back in file: %v", err)
 		}
-		// TODO: multi writer with this to decide if it's valid jpg?
+
+		// try a few things for a time value
+		var t time.Time
+		{
+			success := false
+			if t, err = parseExif(f); err == nil {
+				success = true
+			}
+			if !success {
+				log.Printf("no exif for %q: %+v", path, err)
+				t, err = mtime(path)
+			}
+			if err != nil {
+				return nil, fmt.Errorf("unable to calculate reasonble time for jpg %q: %v", path, err)
+			}
+		}
+
+		if _, err := f.Seek(0, 0); err != nil {
+			return nil, fmt.Errorf("couldn't seek back in file: %v", err)
+		}
 		hash := md5.New()
 		if _, err := io.Copy(hash, f); err != nil {
 			return nil, fmt.Errorf("problem calculating checksum on %q: %v", path, err)
@@ -242,9 +256,9 @@ func _parse(path string) (file, error) {
 		r = jpg{
 			path:  path,
 			hash:  fmt.Sprintf("%x", hash.Sum(nil)),
-			year:  fmt.Sprintf("%04d", tm.Year()),
-			month: fmt.Sprintf("%02d", tm.Month()),
-			time:  fmt.Sprintf("%d", tm.UnixNano()),
+			year:  fmt.Sprintf("%04d", t.Year()),
+			month: fmt.Sprintf("%02d", t.Month()),
+			time:  fmt.Sprintf("%d", t.UnixNano()),
 		}
 	case ".png":
 		return nil, fmt.Errorf("NYI: %q", path)
@@ -288,4 +302,28 @@ type dup struct {
 
 func (d dup) Error() string {
 	return fmt.Sprintf("dup: %q", d.path)
+}
+
+func parseExif(f io.Reader) (time.Time, error) {
+	ti := time.Time{}
+	x, err := exif.Decode(f)
+	if err != nil {
+		if exif.IsCriticalError(err) {
+			return ti, err
+		}
+	}
+	tm, err := x.DateTime()
+	if err != nil {
+		return ti, fmt.Errorf("no datetime in an ostensibly valid exif %v", err)
+	}
+	return tm, nil
+}
+
+func mtime(path string) (time.Time, error) {
+	ti := time.Time{}
+	s, err := os.Stat(path)
+	if err != nil {
+		return ti, fmt.Errorf("failure to collect times from stat: %v", err)
+	}
+	return s.ModTime(), nil
 }
