@@ -1,9 +1,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 
 	"mcquay.me/arrange"
 )
@@ -16,36 +18,31 @@ type stats struct {
 	moved int
 }
 
+var cores = flag.Int("cores", 0, "how many threads to use")
+
 func main() {
+	flag.Parse()
 	log.SetFlags(log.Lshortfile)
-	if len(os.Args) != 3 {
+	if len(flag.Args()) != 2 {
 		fmt.Fprintf(os.Stderr, "%s\n", usage)
 		os.Exit(1)
 	}
-	in, out := os.Args[1], os.Args[2]
+	in, out := flag.Args()[0], flag.Args()[1]
 
 	if err := arrange.PrepOutput(out); err != nil {
 		fmt.Fprintf(os.Stderr, "problem creating directory structure: %v", err)
 		os.Exit(1)
 	}
 
-	exts := map[string]bool{
-		// images
-		".jpg":  true,
-		".jpeg": true,
-		".png":  true,
-		".gif":  true,
-
-		// videos
-		".mov": true,
-		".mp4": true,
-		".m4v": true,
-	}
-
-	work := arrange.Source(in, exts)
+	work := arrange.Source(in)
 	streams := []<-chan arrange.File{}
 
-	for w := 0; w < 16; w++ {
+	workers := runtime.NumCPU()
+	if *cores != 0 {
+		workers = *cores
+	}
+
+	for w := 0; w < workers; w++ {
 		streams = append(streams, arrange.Parse(work))
 	}
 

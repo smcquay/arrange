@@ -20,11 +20,9 @@ func (m Media) Move(root string) error {
 }
 
 type Image struct {
-	Path  string
-	Hash  string
-	Year  string
-	Month string
-	Time  string
+	Path string
+	Hash string
+	Time time.Time
 }
 
 func (im Image) Move(root string) error {
@@ -49,11 +47,16 @@ func (im Image) Move(root string) error {
 	if _, err := io.Copy(out, f); err != nil {
 		return fmt.Errorf("trouble copying file: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(root, "date", im.Year, im.Month), 0755); err != nil {
+
+	year := fmt.Sprintf("%04d", im.Time.Year())
+	month := fmt.Sprintf("%02d", im.Time.Month())
+	ts := fmt.Sprintf("%d", im.Time.UnixNano())
+
+	if err := os.MkdirAll(filepath.Join(root, "date", year, month), 0755); err != nil {
 		return fmt.Errorf("problem creating date directory: %v", err)
 	}
 
-	date := filepath.Join(root, "date", im.Year, im.Month, im.Time)
+	date := filepath.Join(root, "date", year, month, ts)
 	name := date + ".jpg"
 	for i := 0; i < 10000; i++ {
 		if _, err := os.Stat(name); os.IsNotExist(err) {

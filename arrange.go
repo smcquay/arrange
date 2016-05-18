@@ -13,6 +13,23 @@ import (
 	"time"
 )
 
+var exts map[string]bool
+
+func init() {
+	exts = map[string]bool{
+		// images
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+		".gif":  true,
+
+		// videos
+		".mov": true,
+		".mp4": true,
+		".m4v": true,
+	}
+}
+
 type File interface {
 	Move(root string) error
 }
@@ -30,7 +47,7 @@ func PrepOutput(root string) error {
 	return nil
 }
 
-func Source(root string, exts map[string]bool) <-chan string {
+func Source(root string) <-chan string {
 	out := make(chan string)
 	go func() {
 		err := filepath.Walk(
@@ -42,8 +59,6 @@ func Source(root string, exts map[string]bool) <-chan string {
 				ext := strings.ToLower(filepath.Ext(path))
 				if _, ok := exts[ext]; ok {
 					out <- path
-				} else {
-					log.Printf("ignoring: %q", path)
 				}
 				return nil
 			},
@@ -118,7 +133,6 @@ func _parse(path string) (File, error) {
 				success = true
 			}
 			if !success {
-				log.Printf("no exif for %q: %+v", path, err)
 				t, err = mtime(path)
 			}
 			if err != nil {
@@ -134,11 +148,9 @@ func _parse(path string) (File, error) {
 			return nil, fmt.Errorf("problem calculating checksum on %q: %v", path, err)
 		}
 		r = Image{
-			Path:  path,
-			Hash:  fmt.Sprintf("%x", hash.Sum(nil)),
-			Year:  fmt.Sprintf("%04d", t.Year()),
-			Month: fmt.Sprintf("%02d", t.Month()),
-			Time:  fmt.Sprintf("%d", t.UnixNano()),
+			Path: path,
+			Hash: fmt.Sprintf("%x", hash.Sum(nil)),
+			Time: t,
 		}
 	case ".png":
 		return nil, fmt.Errorf("NYI: %q", path)
