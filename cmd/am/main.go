@@ -35,7 +35,7 @@ func main() {
 	}
 
 	work := arrange.Source(in)
-	streams := []<-chan arrange.File{}
+	streams := []<-chan arrange.Media{}
 
 	workers := runtime.NumCPU()
 	if *cores != 0 {

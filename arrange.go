@@ -3,7 +3,9 @@ package arrange
 import (
 	"crypto/md5"
 	"fmt"
+	"image/gif"
 	"image/jpeg"
+	"image/png"
 	"io"
 	"log"
 	"os"
@@ -30,8 +32,13 @@ func init() {
 	}
 }
 
-type File interface {
-	Move(root string) error
+func mtime(path string) (time.Time, error) {
+	ti := time.Time{}
+	s, err := os.Stat(path)
+	if err != nil {
+		return ti, fmt.Errorf("failure to collect times from stat: %v", err)
+	}
+	return s.ModTime(), nil
 }
 
 func PrepOutput(root string) error {
@@ -74,8 +81,8 @@ func Source(root string) <-chan string {
 	return out
 }
 
-func Parse(in <-chan string) <-chan File {
-	out := make(chan File)
+func Parse(in <-chan string) <-chan Media {
+	out := make(chan Media)
 	go func() {
 		for path := range in {
 			f, err := _parse(path)
@@ -97,7 +104,7 @@ func Parse(in <-chan string) <-chan File {
 	return out
 }
 
-func Move(in <-chan File, root string) <-chan error {
+func Move(in <-chan Media, root string) <-chan error {
 	out := make(chan error)
 	go func() {
 		for i := range in {
@@ -108,28 +115,30 @@ func Move(in <-chan File, root string) <-chan error {
 	return out
 }
 
-func _parse(path string) (File, error) {
+func _parse(path string) (Media, error) {
 	ext := strings.ToLower(filepath.Ext(path))
-	var r File
+	var r Media
+	hash := md5.New()
+	var t time.Time
+
+	f, err := os.Open(path)
+	if err != nil {
+		return r, fmt.Errorf("problem opening file: %v", err)
+	}
+	defer f.Close()
+
 	switch ext {
 	default:
-		return nil, NotMedia{path}
+		return r, NotMedia{path}
 	case ".jpg", ".jpeg":
-		f, err := os.Open(path)
-		if err != nil {
-			return nil, fmt.Errorf("problem opening file: %v", err)
-		}
-		defer f.Close()
-
 		if _, err := jpeg.DecodeConfig(f); err != nil {
-			return nil, NotMedia{path}
+			return r, NotMedia{path}
 		}
 		if _, err := f.Seek(0, 0); err != nil {
-			return nil, fmt.Errorf("couldn't seek back in file: %v", err)
+			return r, fmt.Errorf("couldn't seek back in file: %v", err)
 		}
 
 		// try a few things for a time value
-		var t time.Time
 		{
 			success := false
 			if t, err = parseExif(f); err == nil {
@@ -139,34 +148,59 @@ func _parse(path string) (File, error) {
 				t, err = mtime(path)
 			}
 			if err != nil {
-				return nil, fmt.Errorf("unable to calculate reasonble time for jpg %q: %v", path, err)
+				return r, fmt.Errorf("unable to calculate reasonble time for jpg %q: %v", path, err)
 			}
 		}
-
-		if _, err := f.Seek(0, 0); err != nil {
-			return nil, fmt.Errorf("couldn't seek back in file: %v", err)
-		}
-		hash := md5.New()
-		if _, err := io.Copy(hash, f); err != nil {
-			return nil, fmt.Errorf("problem calculating checksum on %q: %v", path, err)
-		}
-		r = Image{
-			Path: path,
-			Hash: fmt.Sprintf("%x", hash.Sum(nil)),
-			Time: t,
-		}
 	case ".png":
-		return nil, fmt.Errorf("NYI: %q", path)
+		if _, err := png.DecodeConfig(f); err != nil {
+			return r, NotMedia{path}
+		}
+		if _, err := f.Seek(0, 0); err != nil {
+			return r, fmt.Errorf("couldn't seek back in file: %v", err)
+		}
+
+		t, err = mtime(path)
+		if err != nil {
+			return r, fmt.Errorf("unable to calculate reasonble time for media %q: %v", path, err)
+		}
+	case ".gif":
+		if _, err := gif.DecodeConfig(f); err != nil {
+			return r, NotMedia{path}
+		}
+		if _, err := f.Seek(0, 0); err != nil {
+			return r, fmt.Errorf("couldn't seek back in file: %v", err)
+		}
+
+		t, err = mtime(path)
+		if err != nil {
+			return r, fmt.Errorf("unable to calculate reasonble time for media %q: %v", path, err)
+		}
 	case ".mov", ".mp4", ".m4v":
-		return nil, fmt.Errorf("NYI: %q", path)
+		t, err = mtime(path)
+		if err != nil {
+			return r, fmt.Errorf("unable to calculate reasonble time for media %q: %v", path, err)
+		}
+	}
+
+	if _, err := f.Seek(0, 0); err != nil {
+		return r, fmt.Errorf("couldn't seek back in file: %v", err)
+	}
+	if _, err := io.Copy(hash, f); err != nil {
+		return r, fmt.Errorf("problem calculating checksum on %q: %v", path, err)
+	}
+	r = Media{
+		Path:      path,
+		Hash:      fmt.Sprintf("%x", hash.Sum(nil)),
+		Extension: ext,
+		Time:      t,
 	}
 	return r, nil
 }
 
-func Merge(cs []<-chan File) <-chan File {
-	out := make(chan File)
+func Merge(cs []<-chan Media) <-chan Media {
+	out := make(chan Media)
 	var wg sync.WaitGroup
-	output := func(c <-chan File) {
+	output := func(c <-chan Media) {
 		for n := range c {
 			out <- n
 		}
