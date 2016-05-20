@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// Media is the high-level filetype that can be arranged.
 type Media struct {
 	Path      string
 	Hash      string
@@ -15,6 +16,8 @@ type Media struct {
 	Time      time.Time
 }
 
+// Move is called to push Media into its final destination, by content address
+// and by date.
 func (m Media) Move(root string) error {
 	f, err := os.Open(m.Path)
 	if err != nil {

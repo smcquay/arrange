@@ -194,8 +194,8 @@ func TestMoveCollision(t *testing.T) {
 }
 
 func TestSundry(t *testing.T) {
-	fmt.Sprintf("%v", NotMedia{"hi"})
-	fmt.Sprintf("%v", Dup{"hi"})
+	_ = fmt.Sprintf("%v", NotMedia{"hi"})
+	_ = fmt.Sprintf("%v", Dup{"hi"})
 }
 
 func TestFlow(t *testing.T) {
@@ -272,7 +272,7 @@ func TestFlow(t *testing.T) {
 
 	for err := range Move(Merge(streams), tmp) {
 		if err != nil {
-			t.Errorf("unexpected error: %v")
+			t.Errorf("unexpected error: %v", err)
 		}
 	}
 

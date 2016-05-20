@@ -42,6 +42,7 @@ func mtime(path string) (time.Time, error) {
 	return s.ModTime(), nil
 }
 
+// PrepOutput creates all possible content-address prefix directories.
 func PrepOutput(root string) error {
 	for i := 0; i <= 0xff; i++ {
 		dirname := filepath.Join(root, "content", fmt.Sprintf("%02x", i))
@@ -55,6 +56,7 @@ func PrepOutput(root string) error {
 	return nil
 }
 
+// Source returns sends all files that match known extensions.
 func Source(root string) <-chan string {
 	out := make(chan string)
 	go func() {
@@ -82,6 +84,10 @@ func Source(root string) <-chan string {
 	return out
 }
 
+// Parse runs the file parser for each file on input chan, and sends results
+// down output chan.
+//
+// Exists so that it can be called many times concurrently.
 func Parse(in <-chan string) <-chan Media {
 	out := make(chan Media)
 	go func() {
@@ -105,6 +111,8 @@ func Parse(in <-chan string) <-chan Media {
 	return out
 }
 
+// Move calls Move on each Media on input chan. It is the first step in the
+// pipeline after fan-in.
 func Move(in <-chan Media, root string) <-chan error {
 	out := make(chan error)
 	go func() {
@@ -198,6 +206,7 @@ func _parse(path string) (Media, error) {
 	return r, nil
 }
 
+// Merge implements fan-in.
 func Merge(cs []<-chan Media) <-chan Media {
 	out := make(chan Media)
 	var wg sync.WaitGroup
