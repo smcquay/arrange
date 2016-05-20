@@ -29,6 +29,7 @@ func init() {
 		".mov": true,
 		".mp4": true,
 		".m4v": true,
+		".avi": true,
 	}
 }
 
@@ -175,7 +176,7 @@ func _parse(path string) (Media, error) {
 		if err != nil {
 			return r, fmt.Errorf("unable to calculate reasonble time for media %q: %v", path, err)
 		}
-	case ".mov", ".mp4", ".m4v":
+	case ".mov", ".mp4", ".m4v", ".avi":
 		t, err = mtime(path)
 		if err != nil {
 			return r, fmt.Errorf("unable to calculate reasonble time for media %q: %v", path, err)
