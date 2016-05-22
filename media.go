@@ -41,6 +41,10 @@ func (m Media) Move(root string) error {
 		return fmt.Errorf("trouble copying file: %v", err)
 	}
 
+	if err := os.Chtimes(content, time.Now(), m.Time); err != nil {
+		return fmt.Errorf("couldn't chtimes for %q: %v", content, err)
+	}
+
 	year := fmt.Sprintf("%04d", m.Time.Year())
 	month := fmt.Sprintf("%02d", m.Time.Month())
 	ts := fmt.Sprintf("%d", m.Time.UnixNano())
