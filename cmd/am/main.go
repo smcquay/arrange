@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"runtime"
-
-	"mcquay.me/arrange"
 )
 
-const usage = "aj <indir> <outdir>"
+const usage = "am <arr|help> [flags]"
+const arrUsage = "am arr [-h|-cores=N] <in> <out>"
 
 type stats struct {
 	total int
@@ -21,47 +19,31 @@ type stats struct {
 var cores = flag.Int("cores", 0, "how many threads to use")
 
 func main() {
-	flag.Parse()
-	log.SetFlags(log.Lshortfile)
-	if len(flag.Args()) != 2 {
+	if len(os.Args) < 2 {
 		fmt.Fprintf(os.Stderr, "%s\n", usage)
 		os.Exit(1)
 	}
-	in, out := flag.Args()[0], flag.Args()[1]
+	var sub string
+	sub, os.Args = os.Args[1], os.Args[1:]
 
-	if err := arrange.PrepOutput(out); err != nil {
-		fmt.Fprintf(os.Stderr, "problem creating directory structure: %v", err)
+	flag.Parse()
+	log.SetFlags(log.Lshortfile)
+
+	switch sub {
+	case "ar", "arr", "arrange":
+		args := flag.Args()
+		if len(args) != 2 {
+			fmt.Fprintf(os.Stderr, "%s\n", arrUsage)
+			os.Exit(1)
+		}
+		in, out := args[0], args[1]
+		if err := arr(in, out); err != nil {
+			fmt.Fprintf(os.Stderr, "problem arranging media: %v\n", err)
+			os.Exit(1)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "%s\n", usage)
 		os.Exit(1)
 	}
 
-	work := arrange.Source(in)
-	streams := []<-chan arrange.Media{}
-
-	workers := runtime.NumCPU()
-	if *cores != 0 {
-		workers = *cores
-	}
-
-	for w := 0; w < workers; w++ {
-		streams = append(streams, arrange.Parse(work))
-	}
-
-	st := stats{}
-	for err := range arrange.Move(arrange.Merge(streams), out) {
-		st.total++
-		if err != nil {
-			switch err.(type) {
-			case arrange.Dup:
-				st.dupes++
-			default:
-				log.Printf("%+v", err)
-			}
-		} else {
-			st.moved++
-		}
-	}
-
-	log.Printf("dupes: %+v", st.dupes)
-	log.Printf("moved: %+v", st.moved)
-	log.Printf("total: %+v", st.total)
 }
