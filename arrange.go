@@ -111,6 +111,31 @@ func Parse(in <-chan string) <-chan Media {
 	return out
 }
 
+// MissingLink detects if the values coming from medias is a duplicate file
+// rather than a hardlink to the content store.
+func MissingLink(medias <-chan Media, root string) (<-chan Media, <-chan error) {
+	out := make(chan Media)
+	errs := make(chan error)
+	go func() {
+		for m := range medias {
+			var d, c os.FileInfo
+			var err error
+			if d, err = os.Stat(m.Path); err != nil {
+				errs <- err
+			}
+			if c, err = os.Stat(m.Content(root)); err != nil {
+				errs <- err
+			}
+			if !os.SameFile(d, c) {
+				out <- m
+			}
+		}
+		close(errs)
+		close(out)
+	}()
+	return out, errs
+}
+
 // Move calls Move on each Media on input chan. It is the first step in the
 // pipeline after fan-in.
 func Move(in <-chan Media, root string) <-chan error {

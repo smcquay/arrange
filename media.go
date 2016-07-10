@@ -25,7 +25,7 @@ func (m Media) Move(root string) error {
 	}
 	defer f.Close()
 
-	content := filepath.Join(root, "content", m.Hash[:2], m.Hash[2:]+m.Extension)
+	content := m.Content(root)
 
 	if _, err := os.Stat(content); !os.IsNotExist(err) {
 		return Dup{content}
@@ -66,4 +66,9 @@ func (m Media) Move(root string) error {
 	// rel := filepath.Join("..", "..", "..", "content", j.hash[:2], j.hash[2:]+m.Extension)
 	// return os.Symlink(rel, name)
 	return os.Link(content, name)
+}
+
+// Content returns the content-address path starting at root.
+func (m Media) Content(root string) string {
+	return filepath.Join(root, "content", m.Hash[:2], m.Hash[2:]+m.Extension)
 }

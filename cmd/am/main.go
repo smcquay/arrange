@@ -7,8 +7,9 @@ import (
 	"os"
 )
 
-const usage = "am <arr|help> [flags]"
+const usage = "am <arr|clean|help> [flags]"
 const arrUsage = "am arr [-h|-cores=N] <in> <out>"
+const cleanUsage = "am clean [-h|-cores=N] <directory>"
 
 type stats struct {
 	total int
@@ -39,6 +40,17 @@ func main() {
 		in, out := args[0], args[1]
 		if err := arr(in, out); err != nil {
 			fmt.Fprintf(os.Stderr, "problem arranging media: %v\n", err)
+			os.Exit(1)
+		}
+	case "c", "cl", "clean":
+		args := flag.Args()
+		if len(args) != 1 {
+			fmt.Fprintf(os.Stderr, "%s\n", cleanUsage)
+			os.Exit(1)
+		}
+		dir := args[0]
+		if err := clean(dir); err != nil {
+			fmt.Fprintf(os.Stderr, "problem cleaning: %v\n", err)
 			os.Exit(1)
 		}
 	default:
