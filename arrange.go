@@ -92,7 +92,7 @@ func Parse(in <-chan string) <-chan Media {
 	out := make(chan Media)
 	go func() {
 		for path := range in {
-			f, err := _parse(path)
+			f, err := ParseFile(path)
 			if err != nil {
 				switch err.(type) {
 				case NotMedia:
@@ -149,7 +149,8 @@ func Move(in <-chan Media, root string) <-chan error {
 	return out
 }
 
-func _parse(path string) (Media, error) {
+// ParseFile extracts metadata from single file.
+func ParseFile(path string) (Media, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 	var r Media
 	hash := md5.New()
