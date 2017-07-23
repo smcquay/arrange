@@ -7,9 +7,10 @@ import (
 	"os"
 )
 
-const usage = "am <arr|clean|help> [flags]"
+const usage = "am <arr|clean|meta> [flags]"
 const arrUsage = "am arr [-h|-cores=N] <in> <out>"
 const cleanUsage = "am clean [-h|-cores=N] <directory>"
+const metaUsage = "am meta [-h|-cores=N] <file0> <file1> ... <fileN>"
 
 type stats struct {
 	total int
@@ -53,6 +54,13 @@ func main() {
 			fmt.Fprintf(os.Stderr, "problem cleaning: %v\n", err)
 			os.Exit(1)
 		}
+	case "m", "meta":
+		args := flag.Args()
+		if len(args) < 1 {
+			fmt.Fprintf(os.Stderr, "%s\n", metaUsage)
+			os.Exit(1)
+		}
+		meta(args)
 	default:
 		fmt.Fprintf(os.Stderr, "%s\n", usage)
 		os.Exit(1)
